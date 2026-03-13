@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(VOTER)
+  voterId      String?  @unique
+  verified     Boolean  @default(false)
+  hasVoted     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  tokens       VotingToken[]
+}
+
+model Election {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startTime   DateTime
+  endTime     DateTime
+  status      ElectionStatus @default(DRAFT)
+
+  createdAt   DateTime @default(now())
+  createdBy   String
+
+  candidates  Candidate[]
+  votes       Vote[]
+}
+
+model Candidate {
+  id          String   @id @default(uuid())
+  name        String
+  party       String?
+  description String?
+
+  electionId  String
+  election    Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  votes       Vote[]
+}
+
+model Vote {
+  id           String   @id @default(uuid())
+  voteHash     String   // Current node hash
+  previousHash String?  // Hash of previous vote in chain
+  receiptId    String   @unique
+  timestamp    DateTime @default(now())
+  
+  electionId   String
+  candidateId  String
+
+  election     Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+model VotingToken {
+  id         String   @id @default(uuid())
+  token      String   @unique
+  used       Boolean  @default(false)
+  issuedAt   DateTime @default(now())
+
+  userId     String
+  electionId String
+
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  userId    String?
+}
+
+model SecurityEvent {
+  id          String   @id @default(uuid())
+  eventType   String
+  ipAddress   String?
+  description String
+  createdAt    DateTime @default(now())
+}
+
+// Models for Election Simulation (Isolated)
+model SimulationElection {
+  id          String   @id @default(uuid())
+  title       String
+  createdAt   DateTime @default(now())
+  mockVotes   SimulationVote[]
+}
+
+model SimulationVote {
+  id          String   @id @default(uuid())
+  candidate   String
+  timestamp   DateTime @default(now())
+  simulationId String
+  simulation  SimulationElection @relation(fields: [simulationId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  VOTER
+  AUDITOR
+}
+
+enum ElectionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  ARCHIVED
+}
