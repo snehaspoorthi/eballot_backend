@@ -53,14 +53,28 @@ export const verifyLedger = async (req, res) => {
 export const getHealth = async (req, res) => {
     try {
         const dbStatus = await prisma.$queryRaw`SELECT 1`;
+
+        const [totalVoters, totalVotes, activeElections] = await Promise.all([
+            prisma.user.count({ where: { role: 'VOTER' } }),
+            prisma.vote.count(),
+            prisma.election.count({ where: { status: 'OPEN' } }),
+        ]);
+
+        const turnout = totalVoters > 0 ? Math.round((totalVotes / totalVoters) * 100) : 0;
+
         res.json({
             server: 'RUNNING',
             database: dbStatus ? 'CONNECTED' : 'ERROR',
             uptime: process.uptime(),
             memory: process.memoryUsage(),
-            timestamp: new Date()
+            timestamp: new Date(),
+            totalVoters,
+            totalVotes,
+            activeElections,
+            turnout,
         });
     } catch (err) {
         res.status(500).json({ server: 'ERROR', database: 'DISCONNECTED' });
     }
 }
+

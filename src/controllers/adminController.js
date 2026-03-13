@@ -23,6 +23,19 @@ export const createElection = async (req, res) => {
   }
 };
 
+export const getAllElections = async (req, res) => {
+  try {
+    const elections = await prisma.election.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { candidates: true }
+    });
+    res.json(elections);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch elections' });
+  }
+};
+
+
 export const addCandidate = async (req, res) => {
   const { name, party, description, electionId } = req.body;
 

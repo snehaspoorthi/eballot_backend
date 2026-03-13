@@ -15,13 +15,14 @@ export const register = async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const resolvedRole = role || 'VOTER';
     const user = await prisma.user.create({
       data: {
         name,
         email,
         passwordHash,
-        role: role || 'VOTER',
-        voterId: role === 'VOTER' ? uuidv4() : null
+        role: resolvedRole,
+        voterId: resolvedRole === 'VOTER' ? uuidv4() : null
       }
     });
 
@@ -32,7 +33,8 @@ export const register = async (req, res) => {
       userId: user.id 
     });
   } catch (error) {
-    res.status(500).json({ error: 'Registration failed' });
+    console.error('Registration failed:', error);
+    res.status(500).json({ error: error?.message || 'Registration failed' });
   }
 };
 
