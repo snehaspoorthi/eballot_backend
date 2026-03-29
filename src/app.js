@@ -8,6 +8,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import voterRoutes from './routes/voterRoutes.js';
 import auditRoutes from './routes/auditRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +34,15 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/voter', voterRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/profile', profileRoutes);
+
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'E-Ballot Backend API is running',
+    status: 'ok',
+    timestamp: new Date()
+  });
+});
 
 app.get('/health', (req, res) => {
   res.json({ 
