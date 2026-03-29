@@ -27,19 +27,45 @@ export const getElectionById = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/voter/voted-elections
+ * Returns array of election IDs the user has already voted in
+ */
+export const getVotedElections = async (req, res) => {
+  try {
+    const tokens = await prisma.votingToken.findMany({
+      where: { userId: req.user.id, used: true },
+      select: { electionId: true }
+    });
+    const votedIds = tokens.map(t => t.electionId);
+    res.json({ votedElectionIds: votedIds });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch voted elections' });
+  }
+};
+
 export const castVote = async (req, res) => {
-  const { electionId, candidateId } = req.body;
-  const voterId = req.user.id;
+  const { electionId, candidateId, voterId: submittedVoterId } = req.body;
+  const userId = req.user.id;
   const ipAddress = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+
+  // Verify the submitted voter ID matches the authenticated user's voter ID
+  if (!submittedVoterId) {
+    return res.status(400).json({ error: 'Voter ID is required to cast a vote' });
+  }
+
+  if (req.user.voterId !== submittedVoterId) {
+    return res.status(403).json({ error: 'Invalid Voter ID. Please check your Voter ID in your Profile.' });
+  }
 
   try {
     // Advanced Fraud Detection: Check for duplicate IPs in a short period
     const recentIpVotes = await prisma.securityEvent.count({
         where: {
-            eventType: 'DEBUG', // Using a placeholder or check real votes
+            eventType: 'DEBUG',
             ipAddress,
             createdAt: {
-                gt: new Date(Date.now() - 60000) // Last 1 minute
+                gt: new Date(Date.now() - 60000)
             }
         }
     });
@@ -55,13 +81,17 @@ export const castVote = async (req, res) => {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Check if user already voted
-      const user = await tx.user.findUnique({
-        where: { id: voterId }
+      // 1. Check if user already voted IN THIS SPECIFIC ELECTION (not globally)
+      const existingToken = await tx.votingToken.findFirst({
+        where: {
+          userId: userId,
+          electionId: electionId,
+          used: true
+        }
       });
 
-      if (user.hasVoted) {
-        throw new Error('Already voted');
+      if (existingToken) {
+        throw new Error('You have already voted in this election');
       }
 
       // 2. Check if election is OPEN
@@ -77,7 +107,7 @@ export const castVote = async (req, res) => {
       await tx.votingToken.create({
         data: {
           token: uuidv4(),
-          userId: voterId,
+          userId: userId,
           electionId: electionId,
           used: true
         }
@@ -106,16 +136,16 @@ export const castVote = async (req, res) => {
         }
       });
 
-      // 7. Update user as voted
+      // 7. Update user's hasVoted flag (for general profile display)
       await tx.user.update({
-        where: { id: voterId },
+        where: { id: userId },
         data: { hasVoted: true }
       });
 
       return { receiptId };
     }, { timeout: 10000 });
 
-    await logAudit('VOTE_CAST', voterId, { electionId, ipAddress });
+    await logAudit('VOTE_CAST', userId, { electionId, ipAddress });
 
     res.json({
       message: 'Vote cast successfully',

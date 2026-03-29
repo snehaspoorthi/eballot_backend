@@ -1,5 +1,5 @@
 import express from 'express';
-import { getElections, getElectionById, castVote, verifyReceipt } from '../controllers/voterController.js';
+import { getElections, getElectionById, castVote, verifyReceipt, getVotedElections } from '../controllers/voterController.js';
 import { authenticate } from '../middleware/authMiddleware.js';
 import { authorize } from '../middleware/roleMiddleware.js';
 
@@ -10,6 +10,7 @@ router.get('/verify-receipt/:receiptId', verifyReceipt);
 
 router.use(authenticate);
 
+router.get('/voted-elections', getVotedElections);
 router.get('/election/:id', authorize(['VOTER', 'ADMIN', 'AUDITOR']), getElectionById);
 router.post('/cast-vote', authorize('VOTER'), castVote);
 

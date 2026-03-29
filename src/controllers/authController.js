@@ -39,7 +39,7 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, voterId } = req.body;
   const ip = req.ip;
 
   try {
@@ -47,6 +47,12 @@ export const login = async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       await logSecurityEvent('FAILED_LOGIN', `Failed login attempt for email: ${email}`, ip);
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // If voterId is provided (Voter Login flow), verify it
+    if (voterId && user.voterId !== voterId) {
+      await logSecurityEvent('FAILED_LOGIN', `Invalid Voter ID attempt for email: ${email}`, ip);
+      return res.status(401).json({ error: 'Invalid Voter ID' });
     }
 
     const otp = generateOTP(user.id);
